@@ -7,8 +7,10 @@ from __future__ import annotations
 
 import base64
 import io
+import json
 import os
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -31,17 +33,7 @@ TEMPERATURE  = float(os.getenv("TEMPERATURE", "1.4"))    # calibration: soften o
 IMG_SIZE     = int(os.getenv("IMG_SIZE", "224"))
 
 # ── App ───────────────────────────────────────────────────────────────────────
-app = FastAPI(
-    title="CropNet API",
-    version="4.0.0",
-    description="Tunisia-optimized crop disease detection. 55 classes including olive, date palm, wheat, citrus.",
-)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["POST", "GET"],
-    allow_headers=["*"],
-)
+# NOTE: app + middleware are initialized after lifespan() is defined below
 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
@@ -51,8 +43,6 @@ def require_api_key(key: str | None = Security(api_key_header)):
     return key
 
 # ── Labels ────────────────────────────────────────────────────────────────────
-import json
-
 with open(LABELS_PATH) as f:
     _label_data = json.load(f)
 
@@ -188,6 +178,44 @@ INPUT_NAME  = session.get_inputs()[0].name
 OUTPUT_NAME = session.get_outputs()[0].name
 print(f"[CropNet v4] Ready in {time.time()-t0:.1f}s | {NUM_CLASSES} classes | TTA={TTA_CROPS}")
 
+# ── Feedback store ────────────────────────────────────────────────────────────
+FEEDBACK_PATH = Path(os.getenv("FEEDBACK_PATH", "/opt/cropnet/logs/feedback.jsonl"))
+FEEDBACK_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+def save_feedback(entry: dict) -> None:
+    with open(FEEDBACK_PATH, "a") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+# ── Warmup ────────────────────────────────────────────────────────────────────
+def _warmup():
+    """Run a dummy inference to pre-load ONNX graph into memory."""
+    print("[CropNet v4] Running warmup inference...")
+    t0 = time.time()
+    dummy = Image.new("RGB", (224, 224), color=(34, 139, 34))
+    inp = preprocess(dummy)
+    for _ in range(3):  # 3 passes to fully JIT the graph
+        session.run([OUTPUT_NAME], {INPUT_NAME: inp})
+    print(f"[CropNet v4] Warmup done in {time.time()-t0:.1f}s — first request will be fast ⚡")
+
+@asynccontextmanager
+async def lifespan(app_: "FastAPI"):
+    _warmup()
+    yield
+
+app = FastAPI(
+    title="CropNet API",
+    version="4.0.0",
+    description="Tunisia-optimized crop disease detection. 55 classes including olive, date palm, wheat, citrus.",
+    lifespan=lifespan,
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["POST", "GET"],
+    allow_headers=["*"],
+)
+
+
 def infer_tta(img: Image.Image) -> tuple[list[dict], int]:
     """Run TTA inference. Returns (top5, crop_agreement)."""
     crops = five_crops(img)
@@ -241,6 +269,12 @@ class PredictRequest(BaseModel):
     image_base64: str = Field(..., description="Base64-encoded JPEG or PNG image")
     locale: str       = Field("fr",  description="Response language: ar | fr | en")
     crop_hint: str    = Field("",    description="Optional crop type hint (e.g. tomato, olive)")
+    scan_id: str      = Field("",    description="Optional scan ID for feedback correlation")
+
+class FeedbackRequest(BaseModel):
+    scan_id:        str  = Field(..., description="Scan ID from predict response")
+    correct_label:  str  = Field(..., description="Correct disease label (raw class name)")
+    user_confirmed: bool = Field(True, description="True = model was right, False = correction")
 
 class ClassResult(BaseModel):
     label_raw:      str
@@ -250,6 +284,7 @@ class ClassResult(BaseModel):
     is_tunisia:     bool
 
 class PredictResponse(BaseModel):
+    scan_id:        str
     disease:        str
     disease_en:     str
     disease_raw:    str
@@ -278,6 +313,7 @@ def health():
 
 @app.post("/predict", response_model=PredictResponse)
 def predict(req: PredictRequest, _key: str = Security(require_api_key)):
+    import uuid
     # Decode image
     try:
         img_bytes = base64.b64decode(req.image_base64)
@@ -290,9 +326,10 @@ def predict(req: PredictRequest, _key: str = Security(require_api_key)):
     inf_ms = int((time.time() - t0) * 1000)
 
     top = top5_raw[0]
-    top_label   = top["label"]
-    top_conf    = top["confidence"]
+    top_label    = top["label"]
+    top_conf     = top["confidence"]
     below_thresh = top_conf < CONF_THRESH
+    scan_id      = req.scan_id or str(uuid.uuid4())
 
     locale = req.locale if req.locale in ("ar", "fr", "en") else "fr"
 
@@ -307,7 +344,23 @@ def predict(req: PredictRequest, _key: str = Security(require_api_key)):
         for r in top5_raw
     ]
 
+    # Log prediction for auto-learning dataset
+    save_feedback({
+        "scan_id":        scan_id,
+        "timestamp":      time.time(),
+        "predicted":      top_label,
+        "confidence":     top_conf,
+        "crop_hint":      req.crop_hint,
+        "locale":         locale,
+        "below_threshold": below_thresh,
+        "top5":           [r["label"] for r in top5_raw],
+        "crop_agreement": crop_agreement,
+        "user_confirmed": None,   # filled later via /feedback
+        "correct_label":  None,
+    })
+
     return PredictResponse(
+        scan_id=        scan_id,
         disease=        translate_label(top_label, locale),
         disease_en=     translate_label(top_label, "en"),
         disease_raw=    top_label,
@@ -321,3 +374,46 @@ def predict(req: PredictRequest, _key: str = Security(require_api_key)):
         inference_ms=   inf_ms,
         below_threshold=below_thresh,
     )
+
+@app.post("/feedback")
+def feedback(req: FeedbackRequest, _key: str = Security(require_api_key)):
+    """
+    Collect user feedback — was the model right or wrong?
+    Builds the labeled dataset for future fine-tuning.
+    """
+    save_feedback({
+        "scan_id":        req.scan_id,
+        "timestamp":      time.time(),
+        "user_confirmed": req.user_confirmed,
+        "correct_label":  req.correct_label,
+        "type":           "feedback",
+    })
+    return {"status": "ok", "message": "Feedback recorded. Thank you 🌾"}
+
+@app.get("/feedback/stats")
+def feedback_stats(_key: str = Security(require_api_key)):
+    """Return feedback dataset stats."""
+    if not FEEDBACK_PATH.exists():
+        return {"total": 0, "confirmed": 0, "corrections": 0, "accuracy": None}
+
+    total = confirmed = corrections = 0
+    with open(FEEDBACK_PATH) as f:
+        for line in f:
+            try:
+                entry = json.loads(line)
+                if entry.get("type") == "feedback":
+                    total += 1
+                    if entry.get("user_confirmed"):
+                        confirmed += 1
+                    else:
+                        corrections += 1
+            except Exception:
+                pass
+
+    accuracy = round(confirmed / total * 100, 1) if total > 0 else None
+    return {
+        "total_feedback": total,
+        "confirmed":      confirmed,
+        "corrections":    corrections,
+        "real_world_accuracy": f"{accuracy}%" if accuracy else "no data",
+    }
