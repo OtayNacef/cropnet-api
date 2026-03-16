@@ -138,4 +138,70 @@ See `nginx/cropnet.conf` and `scripts/cropnet.service`.
 
 ---
 
+---
+
+## Training Datasets
+
+CropNet v3 is trained on a merged dataset of **15+ sources** covering real field conditions, lab images, and Tunisia/Mediterranean-specific crops.
+
+### Base Dataset
+
+| Dataset | Images | Classes | Source |
+|---|---|---|---|
+| PlantVillage | ~54,000 | 38 | [dpdl-benchmark/plant_village](https://huggingface.co/datasets/dpdl-benchmark/plant_village) |
+| PlantVillage (augmented) | ~87,000 | 38 | [BrandonFors/Plant-Diseases-PlantVillage-Dataset](https://huggingface.co/datasets/BrandonFors/Plant-Diseases-PlantVillage-Dataset) |
+
+> Hughes, D.P. & Salathé, M. (2015). *An open access repository of images on plant health to enable the development of mobile disease diagnostics.* arXiv:1511.08060
+
+### Mediterranean / Tunisia Crops
+
+| Dataset | Crop | Diseases | Source |
+|---|---|---|---|
+| Wheat Field Disease | Wheat | Yellow Rust, Brown Rust, Septoria, Powdery Mildew, Healthy | [Zenodo 7307816](https://zenodo.org/records/7307816) — **real field conditions** |
+| Wheat Fungi Diseases (WFD) | Wheat | Leaf Rust, Stem Rust, Septoria, Mildew | [wfd.sysbio.ru](https://wfd.sysbio.ru/) |
+| Wheat Plant Diseases | Wheat | Stripe Rust, Leaf Rust, Healthy | [gtsaidata/Wheat-Plant-Diseases-Dataset](https://huggingface.co/datasets/gtsaidata/Wheat-Plant-Diseases-Dataset) |
+| Olive Leaf Image Dataset | Olive | Peacock Spot, Aculus Olearius, Healthy | [Kaggle — habibulbasher01644](https://www.kaggle.com/datasets/habibulbasher01644/olive-leaf-image-dataset) |
+| Date Palm Leaf Diseases | Date Palm | Black Scorch, Fusarium Wilt, Rachis Blight, Leaf Spots, Pest (Parlatoria) | [PMC 2024 — ScienceDirect](https://www.sciencedirect.com/science/article/pii/S2352340924008965) |
+| Grape Leaf Disease | Grape | Black Rot, Esca, Leaf Blight, Healthy | [adamkatchee/grape-leaf-disease-augmented-dataset](https://huggingface.co/datasets/adamkatchee/grape-leaf-disease-augmented-dataset) |
+| Citrus Disease | Citrus | Canker, Greening (HLB), Healthy | [mohitsha03/citrus-disease-classification](https://huggingface.co/datasets/mohitsha03/citrus-disease-classification) |
+
+### Additional Sources
+
+| Dataset | Crops | Source |
+|---|---|---|
+| Plant Disease Image Dataset | Multi-crop | [gtsaidata/Plant-Disease-Image-Dataset](https://huggingface.co/datasets/gtsaidata/Plant-Disease-Image-Dataset) |
+| Plant Disease Recognition | Multi-crop | [NouRed/plant-disease-recognition](https://huggingface.co/datasets/NouRed/plant-disease-recognition) |
+| Bangladesh Multi-Crop | Banana, Wheat, Rice | [Saon110/bd-crop-vegetable-plant-disease-dataset](https://huggingface.co/datasets/Saon110/bd-crop-vegetable-plant-disease-dataset) |
+| Tomato Disease Detection | Tomato | [Amani-Djole/tomato-disease](https://huggingface.co/datasets/Amani-Djole/tomato-disease) |
+| Maize Disease Detection | Maize | [Abonia1/maize-disease-detection](https://huggingface.co/datasets/Abonia1/maize-disease-detection) |
+| Potato Disease Detection | Potato | [Abonia1/potato-disease-detection](https://huggingface.co/datasets/Abonia1/potato-disease-detection) |
+
+### Base Model
+
+| Model | Architecture | Pretrained On | Source |
+|---|---|---|---|
+| PlantDiseaseDetectorVit2 | Vision Transformer (ViT-Base/16) | ImageNet → PlantVillage | [Abhiram4/PlantDiseaseDetectorVit2](https://huggingface.co/Abhiram4/PlantDiseaseDetectorVit2) |
+
+### Why Real Field Images Matter
+
+Standard PlantVillage images are taken in controlled lab conditions (white backgrounds, isolated leaves). Real farm photos have shadows, partial leaves, soil, and variable lighting. CropNet v3 specifically includes datasets collected **in-field** (Zenodo wheat, WFD) to improve real-world accuracy.
+
+---
+
+## Citation
+
+If you use CropNet in your research or product:
+
+```bibtex
+@software{cropnet2026,
+  title   = {CropNet API — Tunisia-Optimized Crop Disease Detection},
+  author  = {Fellah (fellah.tn)},
+  year    = {2026},
+  url     = {https://github.com/OtayNacef/cropnet-api},
+  note    = {ViT fine-tuned on 15+ datasets, 55+ classes, ONNX Runtime}
+}
+```
+
+---
+
 Built for [Fellah](https://app.fellah.tn) 🌾
