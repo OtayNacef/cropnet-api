@@ -1,0 +1,53 @@
+# CropNet API — systemd service
+# Install: sudo cp scripts/cropnet.service /etc/systemd/system/
+#          sudo systemctl daemon-reload
+#          sudo systemctl enable --now cropnet
+
+[Unit]
+Description=CropNet API v4 — Tunisia Crop Disease Detection
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/cropnet
+
+# Environment
+Environment=MODEL_PATH=/opt/cropnet/models/cropnet_v2.onnx
+Environment=LABELS_PATH=/opt/cropnet/models/labels.json
+Environment=CONF_THRESHOLD=0.40
+Environment=TTA_CROPS=5
+Environment=TEMPERATURE=1.4
+Environment=IMG_SIZE=224
+# Set your API key:
+EnvironmentFile=-/opt/cropnet/.env
+
+ExecStart=/opt/cropnet/venv/bin/uvicorn app.main:app \
+    --host 127.0.0.1 \
+    --port 8001 \
+    --workers 2 \
+    --loop uvloop \
+    --http httptools \
+    --log-level warning \
+    --access-log
+
+# Restart policy
+Restart=on-failure
+RestartSec=5s
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/cropnet/logs
+PrivateTmp=true
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=4G
+CPUQuota=300%
+
+[Install]
+WantedBy=multi-user.target
