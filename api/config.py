@@ -105,6 +105,30 @@ SPECIALISTS: dict[str, dict] = {
         "desc": "Watermelon / cucurbit diseases",
         "version": "v1",
     },
+    "peach": {
+        "tier": 1,
+        "enabled": _env_bool("ENABLE_SPECIALIST_PEACH", True),
+        "conf": float(os.getenv("SPECIALIST_THRESHOLD_PEACH", "0.45")),
+        "img_size": 256,
+        "desc": "Peach: bacterial spot, healthy",
+        "version": "v1",
+    },
+    "almond": {
+        "tier": 1,
+        "enabled": _env_bool("ENABLE_SPECIALIST_ALMOND", True),
+        "conf": float(os.getenv("SPECIALIST_THRESHOLD_ALMOND", "0.45")),
+        "img_size": 256,
+        "desc": "Almond: hull rot, leaf scorch, shot hole (awaiting dataset)",
+        "version": "v1",
+    },
+    "pistachio": {
+        "tier": 1,
+        "enabled": _env_bool("ENABLE_SPECIALIST_PISTACHIO", True),
+        "conf": float(os.getenv("SPECIALIST_THRESHOLD_PISTACHIO", "0.45")),
+        "img_size": 256,
+        "desc": "Pistachio: leaf blight, septoria (awaiting dataset)",
+        "version": "v1",
+    },
 }
 
 # ── Crop family mapping (label prefix → specialist key) ──────────────────────
@@ -123,6 +147,8 @@ CROP_FAMILIES: dict[str, str] = {
     "Corn":       "corn",
     "Grape":      "grape",
     "Peach":      "peach",
+    "Almond":     "almond",
+    "Pistachio":  "pistachio",
     "Potato":     "potato",
     "Strawberry": "strawberry",
     "Cherry":     "cherry",
