@@ -22,16 +22,21 @@ Multi-model crop disease diagnosis for Tunisian agriculture.
 
 **General model** provides broad coverage (89 classes, DINOv2-B backbone, 85.8% val accuracy). It acts as both a classifier and a router — the top-k predictions are used to infer the crop family.
 
-**Specialist models** (when trained and deployed) provide higher accuracy for specific Tunisian crops. Routing is threshold-gated: specialists override the general model only when confident enough.
+**Specialist models** provide higher accuracy for specific Tunisian crops. Routing is threshold-gated: specialists override the general model only when confident enough.
 
-### Specialist Tiers
+### Specialist Models — All Deployed ✅
 
-| Tier | Crops | Status |
-|------|-------|--------|
-| **Tier 1** — Production priority | Olive, Date Palm, Wheat, Citrus | Scaffolded, training ready |
-| **Tier 2** — Secondary | Tomato, Pepper, Watermelon | Scaffolded, disabled by default |
+| Tier | Crop | Classes | Val Accuracy | Status |
+|------|------|---------|-------------|--------|
+| **T1** | 🫒 Olive | 3 (healthy, aculus olearius, peacock spot) | **99.63%** | ✅ Live |
+| **T1** | 🌴 Date Palm | 3 (brown spots, healthy, white scale) | **100.0%** | ✅ Live |
+| **T1** | 🌾 Wheat | 3 (healthy, septoria, stripe rust) | **100.0%** | ✅ Live |
+| **T1** | 🍊 Citrus | 5 (black spot, canker, greening, healthy, melanose) | **98.44%** | ✅ Live |
+| **T2** | 🍅 Tomato | 10 (bacterial spot, blights, mold, viruses, etc.) | **99.95%** | ✅ Live |
+| **T2** | 🌶️ Pepper | 2 (bacterial spot, healthy) | **100.0%** | ✅ Live |
+| **T2** | 🍉 Watermelon | 4 (anthracnose, downy mildew, healthy, mosaic virus) | **100.0%** | ✅ Live |
 
-Tier 2 specialists are fully supported in the API, config, and training pipeline. They remain disabled until trained model artifacts and evaluation metrics demonstrate production readiness.
+All specialists use **DINOv2-B** backbone with progressive unfreezing, MixUp augmentation, and cosine LR schedule. ONNX exported (~331 MB each).
 
 ### Tunisia Focus
 
@@ -71,9 +76,9 @@ Requires `X-API-Key` header.
     "calibrated_confidence": null
   },
   "top_predictions": [...],
-  "model_used": "cropnet-general-v1",
-  "model_type": "general",
-  "routing_reason": "Crop 'olive' detected but no specialist loaded — general model only",
+  "model_used": "cropnet-olive-v1",
+  "model_type": "specialist",
+  "routing_reason": "Specialist 'olive' confident (85% ≥ threshold 45%); matched via top-k label",
   "is_low_confidence": false,
   "confidence_level": "high",
   "advisory_only": true,
