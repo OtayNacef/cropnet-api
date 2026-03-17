@@ -1,0 +1,14 @@
+# CropNet specialist training config: tomato
+crop: tomato
+base_model: facebook/dinov2-base
+img_size: 256
+epochs: 15
+batch_size: 64
+lr: 3.0e-4
+weight_decay: 0.01
+label_smoothing: 0.1
+mixup_alpha: 0.3
+unfreeze_partial_epoch: 5
+unfreeze_full_epoch: 10
+grad_clip: 1.0
+num_workers: 4

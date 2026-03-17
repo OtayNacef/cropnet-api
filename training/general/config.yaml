@@ -1,0 +1,14 @@
+# CropNet general model training config
+crop: general
+base_model: facebook/dinov2-base
+img_size: 256
+epochs: 12
+batch_size: 128
+lr: 3.0e-4
+weight_decay: 0.01
+label_smoothing: 0.1
+mixup_alpha: 0.4
+unfreeze_partial_epoch: 4
+unfreeze_full_epoch: 7
+grad_clip: 1.0
+num_workers: 4
