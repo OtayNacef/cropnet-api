@@ -62,3 +62,10 @@ class PredictResponse(BaseModel):
     is_tunisia: bool                 = False
     crop_agreement: str              = ""
     inference_ms: int                = 0
+
+
+class ExplainResponse(PredictResponse):
+    """Prediction + attention heatmap overlay."""
+    heatmap_base64: str              = ""    # base64 JPEG of heatmap overlay
+    attention_grid_size: list[int]   = []    # [H, W] of raw attention grid
+    explain_ms: int                  = 0     # ms for attention extraction

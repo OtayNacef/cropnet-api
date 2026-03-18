@@ -51,7 +51,7 @@ from .inference.metadata import (
 from .inference.preprocess import quality_warnings, validate_image_bytes
 from .inference.specialists import load_available_specialists
 from .routing import Router, RoutingDecision
-from .schemas import FeedbackRequest, PredictRequest, PredictResponse, PredictionItem
+from .schemas import ExplainResponse, FeedbackRequest, PredictRequest, PredictResponse, PredictionItem
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 log = logging.getLogger("cropnet")
@@ -265,6 +265,57 @@ async def predict_upload(
     sid = scan_id or str(uuid.uuid4())
     dec = _router.route(img, crop_hint=crop_hint)
     return _build_response(dec, sid, lang, qw)
+
+
+@app.post("/predict/explain", response_model=ExplainResponse)
+def predict_explain(req: PredictRequest, _key: str = Security(require_api_key)):
+    """Run prediction + DINOv2 attention heatmap visualization.
+
+    Returns the same fields as /predict, plus:
+    - heatmap_base64: base64-encoded JPEG of the attention heatmap overlaid on the image
+    - attention_grid_size: [H, W] of the raw attention grid (e.g. [18, 18])
+    - explain_ms: milliseconds spent on attention extraction
+
+    NOTE: First call is slow (~5-10s) as the PyTorch DINOv2 backbone loads lazily.
+    Subsequent calls reuse the cached model.
+    """
+    if not _router:
+        raise HTTPException(503, "Models not loaded")
+
+    try:
+        raw = base64.b64decode(req.image_base64)
+    except Exception:
+        raise HTTPException(400, "Invalid base64 encoding")
+
+    check = validate_image_bytes(raw)
+    if not check.ok:
+        raise HTTPException(400, check.issue)
+
+    img = Image.open(io.BytesIO(raw)).convert("RGB")
+    qw = quality_warnings(img)
+    lang = req.locale if req.locale in ("ar", "fr", "en") else "fr"
+    scan_id = req.scan_id or str(uuid.uuid4())
+
+    # Normal prediction
+    dec = _router.route(img, crop_hint=req.crop_hint)
+    resp = _build_response(dec, scan_id, lang, qw)
+
+    # Attention heatmap
+    try:
+        from .inference.attention import explain as _explain
+        explain_result = _explain(img, img_size=IMG_SIZE, output_size=(512, 512))
+    except Exception as e:
+        log.error(f"Attention extraction failed: {e}", exc_info=True)
+        raise HTTPException(500, f"Attention heatmap generation failed: {e}")
+
+    log.info(f"[{scan_id[:8]}] explain: {explain_result['extraction_ms']}ms, grid={explain_result['grid_size']}")
+
+    return ExplainResponse(
+        **resp.model_dump(),
+        heatmap_base64=explain_result["heatmap_base64"],
+        attention_grid_size=explain_result["grid_size"],
+        explain_ms=explain_result["extraction_ms"],
+    )
 
 
 @app.post("/feedback")
