@@ -424,6 +424,31 @@ All predictions include:
 
 The system **prefers honest uncertainty over false certainty**. Low-confidence results are clearly marked with explanations.
 
+## Fellah Integration
+
+CropNet is the primary classifier in Fellah's crop scan pipeline:
+
+```
+User selects crop + uploads photo
+  → Fellah sends POST /predict with image + crop_hint + locale
+  → CropNet returns diagnosis (2-5s on VPS)
+  → Fellah checks confidence:
+      ≥35% → text-only GPT-4o-mini for treatment advice (cheap, no image)
+      <35% → GPT-4o-mini Vision fallback (sends image, expensive)
+```
+
+**Key integration details:**
+- `crop_hint` from dropdown is critical — general model can misroute (e.g. olive→citrus)
+- Fellah timeout: 12s (inference 2-5s with TTA_CROPS=3)
+- Response mapping: Fellah reads `primary_prediction.label`, `primary_prediction.confidence`, `top_predictions`
+- API key must be Vercel env `plain` type (not `encrypted`)
+- Crop dropdown is **required** before scanning — ensures crop_hint always sent
+
+**Known limitations:**
+- Specialists trained on PlantVillage **leaf images only** — fruit diseases not recognized
+- General model confuses similar leaf shapes (olive↔citrus) — always use crop_hint
+- 1 Uvicorn worker on 11GB VPS + 4GB swap; ~6GB RSS with 9 models loaded
+
 ---
 
 Built for [Fellah](https://app.fellah.tn) 🌾 — empowering Tunisian farmers with AI.
