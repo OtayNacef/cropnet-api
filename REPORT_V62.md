@@ -1,6 +1,6 @@
 # CropNet v6.2 — Final Production Release
 **Date:** March 21, 2026
-**Status:** 🔒 Locked for 1 year (next retrain: March 2027)
+**Status:** Production Release
 
 ---
 
@@ -114,7 +114,7 @@ User photo + crop_hint → CropNet v6.2 (free, 2-5s)
 - Effective for identifying obvious mislabels
 - Over-flags ~20-30% (prefix confusion, borderline cases)
 - Best use: flag candidates for human review, not auto-delete
-- Cost: ~$35 for 11.5K images with 20 rotating API keys
+- Cost: Automated pipeline with key rotation
 
 ### Tunisian Focus
 - Olive, date palm, citrus, wheat, tomato, pepper get 2x sampling weight
@@ -130,7 +130,7 @@ User photo + crop_hint → CropNet v6.2 (free, 2-5s)
 | Pest detection | No annotated pest data | v7 (2027) |
 | Severity segmentation | Needs SAM integration | v7 |
 | Fruit disease (expanded) | Limited fruit datasets | v7 |
-| Full PlantVillage cleaning | $100+ cost, uncertain ROI | If budget allows |
+| Full PlantVillage cleaning | Pending evaluation | If budget allows |
 | Temperature scaling | Need clean cal set | Post-deployment |
 | Tunisian field photos | Need INRAT partnership | Ongoing |
 
